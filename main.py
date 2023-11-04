@@ -3,6 +3,8 @@ from enum import Enum
 from z3 import *
 
 
+# TODO support inv calls without paired resp
+
 class CallType(Enum):
     INV = True
     RESP = False
@@ -190,20 +192,12 @@ class ConstraintsGenerator:
     def generate_constraints(self, actions):
 
         self.enforce_realtime_order(actions)
-        # if self.alreadyUNSAT:
-        #     print("UNSAT--realtime order not enforced")
-        #     return False
         self.match_all_reads()
         if self.alreadyUNSAT:
-            # print("UNSAT--read has no match")
             return False
         self.concurrent_writes_ordered_by_reads()
-        # if self.alreadyUNSAT:
-        #     print("UNSAT--concurrent writes cannot be ordered by reads")
-        #     return False
         self.no_intervening_writes()
         if self.alreadyUNSAT:
-            # print("UNSAT--intervening write exists b/w match pair")
             return False
         return True
 
