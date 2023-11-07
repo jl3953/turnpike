@@ -177,17 +177,10 @@ class ConstraintsGenerator:
             if op.cmd == Command.READ:
                 self.order_concurrent_writes(op, succs)
 
-    def no_intervening_writes(self):
-        for read_op, write_op in self.matches.items():
-            for op in self.predecessors[read_op]:
-                if op in self.successors[write_op] and op.cmd == Command.WRITE:
-                    print("UNSAT, intervening write b/w match", str(write_op),
-                          " < ", str(op), " < ", str(read_op))
-                    # print(write_op)
-                    # print(op)
-                    # print(read_op)
-                    self.alreadyUNSAT = True
-                    return
+    # def no_intervening_writes(self):
+    #     for read_op, write_op in self.matches.items():
+    #         for op in self.successors.keys():
+    #             if op.cmd is Command.WRITE:
 
     def generate_constraints(self, actions):
 
@@ -195,16 +188,20 @@ class ConstraintsGenerator:
         self.match_all_reads()
         if self.alreadyUNSAT:
             return False
-        self.concurrent_writes_ordered_by_reads()
-        self.no_intervening_writes()
-        if self.alreadyUNSAT:
-            return False
         return True
+        # self.concurrent_writes_ordered_by_reads()
+        # self.no_intervening_writes()
+        # if self.alreadyUNSAT:
+        #     return False
+        # return True
 
 
-def z3solver(successors):
+def z3solver(cg):
     solver = Solver()
+    solver.set(unsat_core=True)
     symbols = {}
+
+    successors = cg.successors
     for op, succs in successors.items():
         # print("op", op)
         if op not in symbols:
@@ -215,12 +212,30 @@ def z3solver(successors):
 
             op_sym = symbols[op]
             succ_sym = symbols[succ]
-            solver.add(And([op_sym < succ_sym, op_sym > 0, succ_sym > 0]))
+            solver.assert_and_track(And([op_sym < succ_sym]),
+                                    "rto {0} < {1}".format(op_sym, succ_sym))
+            # solver.add(And([op_sym < succ_sym, op_sym > 0, succ_sym > 0]))
             # print("{0} < {1}".format(op_sym, succ_sym))
+
+    # no intervening writes between matched reads and writes
+    for read_op, write_op in cg.matches.items():
+        for op in successors.keys():
+            if op.cmd is Command.WRITE:
+                read_sym = symbols[read_op]
+                write_sym = symbols[write_op]
+                op_sym = symbols[op]
+                solver.assert_and_track(
+                    Not(And([write_sym < op_sym, op_sym < read_sym])),
+                    "intervening write ~({0} < {1} < {2})".format(write_sym, op_sym, read_sym))
+                # solver.add(Not(
+                #     And([write_sym < op_sym, op_sym < read_sym])
+                # ))
     solver.add(Distinct([sym for _, sym in symbols.items()]))
+    solver.add(And([op_sym > 0 for op_sym in symbols.values()]))
 
     if solver.check() != sat:
-        print("UNSAT--z3")
+        c = solver.unsat_core()
+        print("UNSAT--z3", c)
         return False, None
 
     model = solver.model()
@@ -229,18 +244,18 @@ def z3solver(successors):
 
 
 def main():
-    # actions = [
-    #     Action("a", CallType.INV, Command.WRITE, k=14, val=1),
-    #     Action("b", CallType.INV, Command.WRITE, k=14, val=2),
-    #     Action("a", CallType.RESP, Command.OK),
-    #     Action("c", CallType.INV, Command.READ, k=14),
-    #     Action("b", CallType.RESP, Command.OK),
-    #     Action("c", CallType.RESP, Command.OK, val=2),
-    #     Action("c", CallType.INV, Command.READ, k=14),
-    #     Action("c", CallType.RESP, Command.OK, val=1),
-    #     Action("x", CallType.INV, Command.READ, k=16),
-    #     Action("x", CallType.RESP, Command.OK, val=5),
-    # ]
+    actions = [
+        Action("a", CallType.INV, Command.WRITE, k=14, val=1),
+        Action("b", CallType.INV, Command.WRITE, k=14, val=2),
+        Action("a", CallType.RESP, Command.OK),
+        Action("c", CallType.INV, Command.READ, k=14),
+        Action("b", CallType.RESP, Command.OK),
+        Action("c", CallType.RESP, Command.OK, val=2),
+        Action("c", CallType.INV, Command.READ, k=14),
+        Action("c", CallType.RESP, Command.OK, val=1),
+        # Action("x", CallType.INV, Command.READ, k=16),
+        # Action("x", CallType.RESP, Command.OK, val=5),
+    ]
     # actions = [
     #     Action("a", CallType.INV, Command.WRITE, k=14, val=1),
     #     Action("b", CallType.INV, Command.WRITE, k=15, val=1),
@@ -251,24 +266,24 @@ def main():
     #     Action("a", CallType.RESP, Command.OK, val=1),
     #     Action("b", CallType.RESP, Command.OK, val=1),
     # ]
-    actions = [
-        Action("x", CallType.INV, Command.READ, k=14),
-        Action("a", CallType.INV, Command.WRITE, k=14, val=1),
-        Action("b", CallType.INV, Command.WRITE, k=14, val=2),
-        Action("c", CallType.INV, Command.WRITE, k=14, val=3),
-        Action("x", CallType.RESP, Command.OK, val=3),
-        Action("x", CallType.INV, Command.READ, k=14),
-        Action("x", CallType.RESP, Command.OK, val=2),
-        Action("x", CallType.INV, Command.READ, k=14),
-        Action("a", CallType.RESP, Command.OK),
-        Action("b", CallType.RESP, Command.OK),
-        Action("c", CallType.RESP, Command.OK),
-        Action("x", CallType.RESP, Command.OK, val=1)
-    ]
+    # actions = [
+    #     Action("x", CallType.INV, Command.READ, k=14),
+    #     Action("a", CallType.INV, Command.WRITE, k=14, val=1),
+    #     Action("b", CallType.INV, Command.WRITE, k=14, val=2),
+    #     Action("c", CallType.INV, Command.WRITE, k=14, val=3),
+    #     Action("x", CallType.RESP, Command.OK, val=3),
+    #     Action("x", CallType.INV, Command.READ, k=14),
+    #     Action("x", CallType.RESP, Command.OK, val=2),
+    #     Action("x", CallType.INV, Command.READ, k=14),
+    #     Action("a", CallType.RESP, Command.OK),
+    #     Action("b", CallType.RESP, Command.OK),
+    #     Action("c", CallType.RESP, Command.OK),
+    #     Action("x", CallType.RESP, Command.OK, val=1)
+    # ]
     cg = ConstraintsGenerator()
     if cg.generate_constraints(actions):
         print(cg)
-        is_sat, solution = z3solver(cg.successors)
+        is_sat, solution = z3solver(cg)
         if is_sat:
             sorted_ops = [str(op) for op, _ in
                           sorted(solution.items(), key=lambda item: item[1])]
