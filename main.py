@@ -1,3 +1,5 @@
+import csv
+import sys
 from enum import Enum
 
 from z3 import *
@@ -52,6 +54,9 @@ class Action:
         self.cmd = cmd
         self.k = k
         self.val = val
+
+    def __str__(self):
+        return "Action(proc={0},call={1},cmd={2},k={3},val={4})".format(self.proc, self.call, self.cmd, self.k, self.val)
 
 
 class ConstraintsGenerator:
@@ -227,6 +232,37 @@ def z3solver(successors):
     values = {op: model.evaluate(s).as_long() for op, s in symbols.items()}
     return True, values
 
+def parseTrace(outfile):
+
+    actions = []
+    with open(outfile, "r") as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if row["Action"] == "init":
+                continue
+
+            action = Action(
+                str(row["ClientID"]),
+                CallType.INV if row["Kind"] == "Invocation" else CallType.RESP,
+                None,
+            )
+
+            if action.call == CallType.INV and row["Action"] == "write":
+                action.cmd = Command.WRITE
+                action.k = row["Payload"]
+                action.val = row["Value"]
+            elif action.call == CallType.RESP and row["Action"] == "write":
+                action.cmd = Command.OK
+            elif action.call == CallType.INV and row["Action"] == "read":
+                action.cmd = Command.READ
+                action.k = row["Payload"]
+            elif action.call == CallType.RESP and row["Action"] == "read":
+                action.cmd = Command.OK
+                action.val = row["Payload"]
+
+            actions.append(action)
+            print(action.__str__())
+    return actions
 
 def main():
     # actions = [
@@ -251,20 +287,23 @@ def main():
     #     Action("a", CallType.RESP, Command.OK, val=1),
     #     Action("b", CallType.RESP, Command.OK, val=1),
     # ]
-    actions = [
-        Action("x", CallType.INV, Command.READ, k=14),
-        Action("a", CallType.INV, Command.WRITE, k=14, val=1),
-        Action("b", CallType.INV, Command.WRITE, k=14, val=2),
-        Action("c", CallType.INV, Command.WRITE, k=14, val=3),
-        Action("x", CallType.RESP, Command.OK, val=3),
-        Action("x", CallType.INV, Command.READ, k=14),
-        Action("x", CallType.RESP, Command.OK, val=2),
-        Action("x", CallType.INV, Command.READ, k=14),
-        Action("a", CallType.RESP, Command.OK),
-        Action("b", CallType.RESP, Command.OK),
-        Action("c", CallType.RESP, Command.OK),
-        Action("x", CallType.RESP, Command.OK, val=1)
-    ]
+
+    outfile = "/Users/jenniferlam/jennLang/output.csv"
+    actions = parseTrace(outfile)
+    # actions = [
+    #     Action("x", CallType.INV, Command.READ, k=14),
+    #     Action("a", CallType.INV, Command.WRITE, k=14, val=1),
+    #     Action("b", CallType.INV, Command.WRITE, k=14, val=2),
+    #     Action("c", CallType.INV, Command.WRITE, k=14, val=3),
+    #     Action("x", CallType.RESP, Command.OK, val=3),
+    #     Action("x", CallType.INV, Command.READ, k=14),
+    #     Action("x", CallType.RESP, Command.OK, val=2),
+    #     Action("x", CallType.INV, Command.READ, k=14),
+    #     Action("a", CallType.RESP, Command.OK),
+    #     Action("b", CallType.RESP, Command.OK),
+    #     Action("c", CallType.RESP, Command.OK),
+    #     Action("x", CallType.RESP, Command.OK, val=1)
+    # ]
     cg = ConstraintsGenerator()
     if cg.generate_constraints(actions):
         print(cg)
