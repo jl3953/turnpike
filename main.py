@@ -258,7 +258,7 @@ def parseTrace(outfile):
                 action.k = row["Payload"]
             elif action.call == CallType.RESP and row["Action"] == "read":
                 action.cmd = Command.OK
-                action.val = row["Payload"]
+                action.val = row["Server"]
 
             actions.append(action)
             print(action.__str__())
