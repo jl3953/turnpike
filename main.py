@@ -238,7 +238,7 @@ def parseTrace(outfile):
     with open(outfile, "r") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            if row["Action"] == "init":
+            if "init" in row["Action"]:
                 continue
 
             action = Action(
@@ -247,18 +247,18 @@ def parseTrace(outfile):
                 None,
             )
 
-            if action.call == CallType.INV and row["Action"] == "write":
+            if action.call == CallType.INV and "write" in row["Action"]:
                 action.cmd = Command.WRITE
                 action.k = row["Payload"]
                 action.val = row["Value"]
-            elif action.call == CallType.RESP and row["Action"] == "write":
+            elif action.call == CallType.RESP and "write" in row["Action"]:
                 action.cmd = Command.OK
-            elif action.call == CallType.INV and row["Action"] == "read":
+            elif action.call == CallType.INV and "read" in row["Action"]:
                 action.cmd = Command.READ
                 action.k = row["Payload"]
-            elif action.call == CallType.RESP and row["Action"] == "read":
+            elif action.call == CallType.RESP and "read" in row["Action"]:
                 action.cmd = Command.OK
-                action.val = row["Server"]
+                action.val = row["Payload"]
 
             actions.append(action)
             print(action.__str__())
