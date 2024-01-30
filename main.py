@@ -56,7 +56,8 @@ class Action:
         self.val = val
 
     def __str__(self):
-        return "Action(proc={0},call={1},cmd={2},k={3},val={4})".format(self.proc, self.call, self.cmd, self.k, self.val)
+        return "Action(proc={0},call={1},cmd={2},k={3},val={4})".format(
+            self.proc, self.call, self.cmd, self.k, self.val)
 
 
 class ConstraintsGenerator:
@@ -231,7 +232,9 @@ def z3solver(cg):
                 op_sym = symbols[op]
                 solver.assert_and_track(
                     Not(And([write_sym < op_sym, op_sym < read_sym])),
-                    "intervening write ~({0} < {1} < {2})".format(write_sym, op_sym, read_sym))
+                    "intervening write ~({0} < {1} < {2})".format(write_sym,
+                                                                  op_sym,
+                                                                  read_sym))
                 # solver.add(Not(
                 #     And([write_sym < op_sym, op_sym < read_sym])
                 # ))
@@ -247,8 +250,8 @@ def z3solver(cg):
     values = {op: model.evaluate(s).as_long() for op, s in symbols.items()}
     return True, values
 
-def parseTrace(outfile):
 
+def parseTrace(outfile):
     actions = []
     with open(outfile, "r") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -270,7 +273,7 @@ def parseTrace(outfile):
                 action.cmd = Command.OK
             elif action.call == CallType.INV and "read" in row["Action"]:
                 action.cmd = Command.READ
-                action.k = row["Payload"]
+                action.k = row["Value"]
             elif action.call == CallType.RESP and "read" in row["Action"]:
                 action.cmd = Command.OK
                 action.val = row["Payload"]
@@ -278,6 +281,7 @@ def parseTrace(outfile):
             actions.append(action)
             print(action.__str__())
     return actions
+
 
 def main():
     actions = [
@@ -303,7 +307,7 @@ def main():
     #     Action("b", CallType.RESP, Command.OK, val=1),
     # ]
 
-    outfile = "/Users/jenniferlam/jennLang/output.csv"
+    outfile = "/home/jennifer/jennLang/output.csv"
     actions = parseTrace(outfile)
     # actions = [
     #     Action("x", CallType.INV, Command.READ, k=14),
