@@ -258,6 +258,8 @@ def parseTrace(outfile):
         for row in reader:
             if "init" in row["Action"]:
                 continue
+            elif "triggerFailover" in row["Action"]:
+                continue
 
             action = Action(
                 str(row["ClientID"]),
@@ -273,10 +275,10 @@ def parseTrace(outfile):
                 action.cmd = Command.OK
             elif action.call == CallType.INV and "read" in row["Action"]:
                 action.cmd = Command.READ
-                action.k = row["Value"]
+                action.k = row["Payload"]
             elif action.call == CallType.RESP and "read" in row["Action"]:
                 action.cmd = Command.OK
-                action.val = row["Payload"]
+                action.val = row["Node"]
 
             actions.append(action)
             print(action.__str__())
